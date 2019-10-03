@@ -46,8 +46,8 @@ void execRedirR(char** args,int *flagWait){
 void execRedirL(char** args,int *flagWait){
 
 }
-void exexPipe(char **commands){
-    
+void execPipe(char **commands){
+
 }
 void execArgs(char** args,int *flagWait) 
 { 
@@ -87,7 +87,7 @@ int main(){
 
         if(flagPipe == FLAG_PIPE){
             // deo can care Redirection
-            exexPipe(commands);
+            execPipe(commands);
         } 
         else if(flagPipe == FLAG_PIPE_NONE){
             // Redirection
