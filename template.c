@@ -35,11 +35,20 @@ int processLine(char *line,char **commands){
 // return FLAG_REDIRECTION_L or FLAG_REDIRECTION_R or FLAG_REDIRECTION_NONE
 // separte command 
 // if command has redirection: redir contain output or input name file
-int processCommand(char *command,char **args, char *redir){
+// flagWait = 1 if command end by &
+int processCommand(char *command,char **args, char *redir,int *flagWait){
 
 }
 
+void execRedirR(char** args,int *flagWait){
 
+}
+void execRedirL(char** args,int *flagWait){
+
+}
+void exexPipe(char **commands){
+    
+}
 void execArgs(char** args,int *flagWait) 
 { 
     pid_t pid = fork();  
@@ -66,7 +75,7 @@ int main(){
     int wait = 0;
     int flagPipe = 0;
     int flagRedir = 0;
-    
+    int flagWait = 0;
     __ini__();
 
     while (shouldRun == 1){
@@ -78,21 +87,21 @@ int main(){
 
         if(flagPipe == FLAG_PIPE){
             // deo can care Redirection
-
+            exexPipe(commands);
         } 
         else if(flagPipe == FLAG_PIPE_NONE){
             // Redirection
-            int r = processCommand(commands[0],args,redir);
+            int r = processCommand(commands[0],args,redir,&flagWait);
 
             if(r == FLAG_REDIRECTION_NONE){
                 //
-
+                execArgs(args,flagWait);
             }else if (r == FLAG_REDIRECTION_R){
                 //
-
+                execRedirR(args,flagWait);
             }else if(r == FLAG_REDIRECTION_L){
                 //
-
+                exceRedirL(args,flagWait);
             }
 
         }
