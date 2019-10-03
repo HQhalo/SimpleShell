@@ -10,18 +10,23 @@
 #define FLAG_REDIRECTION_R 2
 #define FLAG_PIPE 3
 #define FLAG_PIPE_NONE 4
-
-char *buffer;
+#define FLAG_WAIT  6
+#define FLAG_WAIT_NONE 7
+#define FLAG_HISTORY 8
+char *bufferConst;
+char *history;
 int bufsize;
 void __ini__(){
     bufsize  = 100;
-    buffer = (char *)malloc(bufsize * sizeof(char));
+    bufferConst = (char *)malloc(bufsize * sizeof(char));
+    history = (char *)malloc(bufsize * sizeof(char));
 }
 
 char *getInput(){
-    getline(&buffer,&bufsize,stdin);
-    buffer[strlen(buffer)-1] = '\0'; // remoce enter character
-    return buffer;
+    getline(&bufferConst,&bufsize,stdin);
+    bufferConst[strlen(bufferConst)-1] = '\0'; // remoce enter character
+    memcpy(history,bufferConst,strlen(bufferConst));
+    return bufferConst;
 }
 
 //
@@ -35,7 +40,7 @@ int processLine(char *line,char **commands){
 // return FLAG_REDIRECTION_L or FLAG_REDIRECTION_R or FLAG_REDIRECTION_NONE
 // separte command 
 // if command has redirection: redir contain output or input name file
-// flagWait = 1 if command end by &
+// flagWait = 1 if command end by &, = FLAG_HISTORY if command == "!!"
 int processCommand(char *command,char **args, char *redir,int *flagWait){
 
 }
@@ -67,22 +72,31 @@ void execArgs(char** args,int *flagWait)
         return; 
     } 
 } 
+
 int main(){
     char * args[MAX_LINE/2+1];
     char *commands[2];
     char redir[MAX_LINE];
+    
+    char *buffer = NULL;
     int shouldRun = 1;
-    int wait = 0;
-    int flagPipe = 0;
-    int flagRedir = 0;
-    int flagWait = 0;
+
+    int flagHistory = -1;
+    int flagPipe = -1;
+    int flagRedir = -1;
+    int flagWait = -1;
     __ini__();
 
     while (shouldRun == 1){
         printf("\nosh>");  
         fflush(stdout);
-        
-        buffer = getInput();
+        if(flagHistory == FLAG_HISTORY){
+            buffer = history;
+            flagHistory = -1;
+        }
+        else {
+            buffer = getInput();
+        }
         flagPipe = processLine(buffer,commands);
 
         if(flagPipe == FLAG_PIPE){
@@ -95,7 +109,14 @@ int main(){
 
             if(r == FLAG_REDIRECTION_NONE){
                 //
-                execArgs(args,flagWait);
+                if(flagWait == FLAG_HISTORY){
+                    flagHistory = FLAG_HISTORY;
+                    buffer = history;
+                }
+                else {
+                    execArgs(args,flagWait);
+                }
+
             }else if (r == FLAG_REDIRECTION_R){
                 //
                 execRedirR(args,flagWait);
