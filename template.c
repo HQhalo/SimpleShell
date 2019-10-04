@@ -77,6 +77,7 @@ int separateSpace(char *command,char **args){
         return FLAG_WAIT_NONE;
     }
     else {
+        args[i] = NULL;
         return FLAG_WAIT;
     }
     return -1;
@@ -86,6 +87,7 @@ int separateSpace(char *command,char **args){
 // separte command 
 // if command has redirection: redir contain output or input name file
 // flagWait = 1 if command end by &
+//
 int processCommand(char *command,char **args, char **redir,int *flagWait){
     char *tempCommand;
     char *tempDir;
@@ -126,22 +128,27 @@ void execPipe(char **commands){
 }
 void execArgs(char** args,int flagWait) 
 { 
-    pid_t pid = fork();  
-    if (pid == -1) { 
-        printf("\nFailed forking child.."); 
-        return; 
-    } else if (pid == 0) { 
-        if (execvp(args[0], args) < 0) { 
-            printf("\nCould not execute command..\n"); 
-        } 
-        exit(0); 
-    } else {
-        if(flagWait == FLAG_WAIT){ 
-            printf("Waiting for finish child.\n");
-            wait(NULL);  
+    pid_t  pid;
+    int status;
+
+    if ((pid = fork()) < 0) {
+        printf("*** ERROR: forking child process failed\n");
+        exit(1);
+    }
+    else if (pid == 0) { 
+        sleep(2);    
+        if (execvp(*args, args) < 0) {     
+            printf("*** ERROR: exec failed\n");
+            exit(1);
         }
-        return; 
-    } 
+    }
+    else {  
+        if(flagWait == FLAG_WAIT){
+            printf("Waiting for Finish child");
+            while (wait(&status) != pid);
+        }
+        return;
+    }
 } 
 
 int main(){
@@ -160,14 +167,16 @@ int main(){
 
     while (shouldRun == 1){
         printf("\nosh>");  
-        fflush(stdout);
+        fflush(stdin);
+        
         buffer = getInput(&flagHistory);
+
         if(flagHistory == FLAG_HISTORY_EMPTY) {
             continue;
         }
         flagPipe = processLine(buffer,commands);
         if(flagPipe == FLAG_PIPE){
-            // deo can care Redirection
+            
             execPipe(commands);
         } 
         else if(flagPipe == FLAG_PIPE_NONE){
@@ -176,12 +185,13 @@ int main(){
             if(r == FLAG_REDIRECTION_NONE){
                 //
                 if(flagWait == FLAG_HISTORY){
-                    printf("his");
+                   
                     flagHistory = FLAG_HISTORY;
                     buffer = history;
                     continue;
                 }
                 else {
+                    //printf("%s_%s_",args[0],args[1]);
                     execArgs(args,flagWait);
                 }
 
