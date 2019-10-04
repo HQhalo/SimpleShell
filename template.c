@@ -13,22 +13,37 @@
 #define FLAG_WAIT  6
 #define FLAG_WAIT_NONE 7
 #define FLAG_HISTORY 8
+#define FLAG_HISTORY_EMPTY 9
+
 char *bufferConst;
 char *history;
+int flagIniHis = 0;
 int bufsize;
+
 void __ini__(){
     bufsize  = 100;
     bufferConst = (char *)malloc(bufsize * sizeof(char));
     history = (char *)malloc(bufsize * sizeof(char));
 }
 
-char *getInput(){
+char *getInput(int *FlagHistory){
     getline(&bufferConst,&bufsize,stdin);
     bufferConst[strlen(bufferConst)-1] = '\0'; // remove enter character
+    
+    // check history
     if(strcmp(bufferConst,"!!")==0){
+        if(flagIniHis == 0){
+            printf("No commands in history"); 
+            *FlagHistory = FLAG_HISTORY_EMPTY;
+            return NULL;        
+        }
+        *FlagHistory =FLAG_HISTORY;
         return history;
     }
     memcpy(history,bufferConst,strlen(bufferConst));
+    
+    flagIniHis = 1;
+    FlagHistory = -1;
     return bufferConst;
 }
 
@@ -38,7 +53,6 @@ char *getInput(){
 int processLine(char *line,char **commands){
     commands[0] = strtok(line,"|");
     commands[1] = strtok(NULL,"|");
-
     if(commands[1] != NULL){
         return FLAG_PIPE;
     }
@@ -60,10 +74,10 @@ int separateSpace(char *command,char **args){
     if(strcmp(args[i-1],"&")==0){
        
         args[i-1] = NULL;
-        return FLAG_WAIT;
+        return FLAG_WAIT_NONE;
     }
     else {
-        return FLAG_WAIT_NONE;
+        return FLAG_WAIT;
     }
     return -1;
 }
@@ -73,7 +87,6 @@ int separateSpace(char *command,char **args){
 // if command has redirection: redir contain output or input name file
 // flagWait = 1 if command end by &
 int processCommand(char *command,char **args, char **redir,int *flagWait){
-        // printf("__%s__\n",command);
     char *tempCommand;
     char *tempDir;
     if(strchr(command,'<')){
@@ -94,7 +107,6 @@ int processCommand(char *command,char **args, char **redir,int *flagWait){
         return FLAG_REDIRECTION_R;
     }
     else {
-        //printf("__%s__\n",command);
         *flagWait = separateSpace(command,args);
         return FLAG_REDIRECTION_NONE;
     }
@@ -103,10 +115,10 @@ int processCommand(char *command,char **args, char **redir,int *flagWait){
     return -1;
 }
 
-void execRedirR(char** args,int flagWait){
+void execRedirR(char** args,char **redir, int flagWait){
 
 }
-void execRedirL(char** args,int flagWait){
+void execRedirL(char** args,char **redir,int flagWait){
 
 }
 void execPipe(char **commands){
@@ -149,12 +161,11 @@ int main(){
     while (shouldRun == 1){
         printf("\nosh>");  
         fflush(stdout);
-       
-        
-        buffer = getInput();
-        
+        buffer = getInput(&flagHistory);
+        if(flagHistory == FLAG_HISTORY_EMPTY) {
+            continue;
+        }
         flagPipe = processLine(buffer,commands);
-
         if(flagPipe == FLAG_PIPE){
             // deo can care Redirection
             execPipe(commands);
@@ -164,7 +175,6 @@ int main(){
             int r = processCommand(commands[0],args,redir,&flagWait);
             if(r == FLAG_REDIRECTION_NONE){
                 //
-               
                 if(flagWait == FLAG_HISTORY){
                     printf("his");
                     flagHistory = FLAG_HISTORY;
@@ -176,11 +186,11 @@ int main(){
                 }
 
             }else if (r == FLAG_REDIRECTION_R){
-                //
-                execRedirR(args,flagWait);
+                //printf("%s",redir[0]);
+                execRedirR(args,redir,flagWait);
             }else if(r == FLAG_REDIRECTION_L){
-                //
-                execRedirL(args,flagWait);
+                //printf("%s",redir[0]);
+                execRedirL(args,redir,flagWait);
             }
             
 
