@@ -125,6 +125,55 @@ void execRedirL(char** args,char **redir,int flagWait){
 }
 void execPipe(char **commands){
 
+    //creat pipe in and out
+    int fd[2];
+    pipe(fd);
+
+    int pid;
+    pid = fork();
+    
+
+    //
+    if (pid < 0){
+        printf("*** ERROR: Creat pipe fail because can't fork");
+        return;
+    }
+    if (pid != 0)  // parent 
+    {   
+
+    }
+    else if (pid == 0) // child 
+    {
+
+        int pidChild;
+        pidChild = fork();
+        if (pidChild < 0) {
+            printf("*** ERROR: Creat pipe fail because can't fork");
+        }
+        else 
+        if (pidChild != 0)  //Child F1 call Right arg
+        {
+            close(fd[0]);
+
+            dup2(fd[1], STDOUT_FILENO);
+            processHelper(commands[0]);
+
+            close(fd[1]);
+
+            exit(1);
+        }
+        else // child F2 call Left arg
+        {
+            close(fd[1]);
+
+            dup2(fd[0], STDIN_FILENO);
+            processHelper(commands[1]);
+            close(fd[0]);
+            
+            exit(1);
+        }
+    }
+    
 }
 void execArgs(char** args,int flagWait) 
 { 
@@ -136,7 +185,7 @@ void execArgs(char** args,int flagWait)
         exit(1);
     }
     else if (pid == 0) { 
-        sleep(2);    
+        //sleep(2);    
         if (execvp(*args, args) < 0) {     
             printf("*** ERROR: exec failed\n");
             exit(1);
@@ -150,6 +199,45 @@ void execArgs(char** args,int flagWait)
         return;
     }
 } 
+
+void processHelper(char *commandline){
+    char * args[MAX_LINE/2+1];
+    char *commands[2];
+    char *redir[MAX_LINE/2+1];
+    
+    char *buffer = NULL;
+    int shouldRun = 1;
+
+    int flagHistory = -1;
+    int flagPipe = -1;
+    int flagRedir = -1;
+    int flagWait = -1;
+
+
+    flagPipe = processLine(commandline,commands);
+    
+    int r = processCommand(commands[0],args,redir,&flagWait);
+            if(r == FLAG_REDIRECTION_NONE){
+                //
+                if(flagWait == FLAG_HISTORY){
+                   
+                    flagHistory = FLAG_HISTORY;
+                    buffer = history;
+                    return ;
+                }
+                else {
+                    //printf("%s_%s_",args[0],args[1]);
+                    execArgs(args,FLAG_WAIT_NONE);
+                }
+
+            }else if (r == FLAG_REDIRECTION_R){
+                //printf("%s",redir[0]);
+                execRedirR(args,redir,flagWait);
+            }else if(r == FLAG_REDIRECTION_L){
+                //printf("%s",redir[0]);
+                execRedirL(args,redir,flagWait);
+            }
+}
 
 int main(){
     char * args[MAX_LINE/2+1];
