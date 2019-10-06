@@ -1,6 +1,9 @@
 #include<stdio.h>
 #include<unistd.h>
 #include<string.h>
+#include <sys/types.h>
+#include <fcntl.h>
+#include <stdlib.h>
 
 #define MAX_LINE 80
 
@@ -118,11 +121,81 @@ int processCommand(char *command,char **args, char **redir,int *flagWait){
 }
 
 void execRedirR(char** args,char **redir, int flagWait){
+    pid_t  pid;
+    int status;
 
+    if ((pid = fork()) < 0) {
+        printf("*** ERROR: forking child process failed\n");
+        exit(1);
+    }
+    else if (pid == 0) { 
+        sleep(2); 
+        //open file redir
+        int fd = open(redir[0], O_CREAT | O_WRONLY | O_TRUNC, 0777);
+        if (fd < 0) {
+            printf("*** ERROR: open output file failed\n");
+            exit(1);
+        }   
+        //replace STDOUT descriptor by fd descriptor
+        if (dup2(fd, STDOUT_FILENO) < 0) {
+            close(fd);
+            printf("** ERROR: dup failed\n");
+            exit(1);
+        }
+        close(fd);
+        //exec as usual
+        if (execvp(*args, args) < 0) {     
+            printf("*** ERROR: exec failed\n");
+            exit(1);
+        }
+    }
+    else {  
+        if(flagWait == FLAG_WAIT){
+            printf("Waiting for Finish child");
+            while (wait(&status) != pid);
+        }
+        return;
+    }
 }
+
 void execRedirL(char** args,char **redir,int flagWait){
+        pid_t  pid;
+    int status;
 
+    if ((pid = fork()) < 0) {
+        printf("*** ERROR: forking child process failed\n");
+        exit(1);
+    }
+    else if (pid == 0) { 
+        sleep(2); 
+        //open file redir
+        int fd = open(redir[0], O_RDONLY, 0777);
+        if (fd < 0) {
+            printf("*** ERROR: open input file failed\n");
+            exit(1);
+        }   
+        //replace STDIN descriptor by fd descriptor
+        if (dup2(fd, STDIN_FILENO) < 0) {
+            close(fd);
+            printf("*** ERROR: dup failed\n");
+            exit(1);
+        }
+        close(fd);
+        //exec as usual
+        if (execvp(*args, args) < 0) {     
+            printf("*** ERROR: exec failed\n");
+            exit(1);
+        }
+    }
+    else {  
+        if(flagWait == FLAG_WAIT){
+            printf("Waiting for Finish child");
+            while (wait(&status) != pid);
+        }
+        return;
+    }
 }
+
 void execPipe(char **commands){
 
 }
