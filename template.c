@@ -1,6 +1,7 @@
 #include<stdio.h>
 #include<unistd.h>
 #include<string.h>
+#include <sys/wait.h> 
 
 #define MAX_LINE 80
 
@@ -43,7 +44,7 @@ char *getInput(int *FlagHistory){
     memcpy(history,bufferConst,strlen(bufferConst));
     
     flagIniHis = 1;
-    FlagHistory = -1;
+    *FlagHistory = -1;
     return bufferConst;
 }
 
@@ -118,65 +119,6 @@ int processCommand(char *command,char **args, char **redir,int *flagWait){
 }
 
 void execRedirR(char** args,char **redir, int flagWait){
-
-}
-void execRedirL(char** args,char **redir,int flagWait){
-
-}
-void execPipe(char **commands){
-
-    //creat pipe in and out
-    int fd[2];
-    pipe(fd);
-
-    int pid;
-    pid = fork();
-    
-
-    //
-    if (pid < 0){
-        printf("*** ERROR: Creat pipe fail because can't fork");
-        return;
-    }
-    if (pid != 0)  // parent 
-    {   
-
-    }
-    else if (pid == 0) // child 
-    {
-
-        int pidChild;
-        pidChild = fork();
-        if (pidChild < 0) {
-            printf("*** ERROR: Creat pipe fail because can't fork");
-        }
-        else 
-        if (pidChild != 0)  //Child F1 call Right arg
-        {
-            close(fd[0]);
-
-            dup2(fd[1], STDOUT_FILENO);
-            processHelper(commands[0]);
-
-            close(fd[1]);
-
-            exit(1);
-        }
-        else // child F2 call Left arg
-        {
-            close(fd[1]);
-
-            dup2(fd[0], STDIN_FILENO);
-            processHelper(commands[1]);
-            close(fd[0]);
-            
-            exit(1);
-        }
-    }
-    
-}
-void execArgs(char** args,int flagWait) 
-{ 
     pid_t  pid;
     int status;
 
@@ -185,7 +127,20 @@ void execArgs(char** args,int flagWait)
         exit(1);
     }
     else if (pid == 0) { 
-        //sleep(2);    
+        //open file redir
+        int fd = open(redir[0], O_CREAT | O_WRONLY | O_TRUNC, 0777);
+        if (fd < 0) {
+            printf("*** ERROR: open output file failed\n");
+            exit(1);
+        }   
+        //replace STDOUT descriptor by fd descriptor
+        if (dup2(fd, STDOUT_FILENO) < 0) {
+            close(fd);
+            printf("** ERROR: dup failed\n");
+            exit(1);
+        }
+        close(fd);
+        //exec as usual
         if (execvp(*args, args) < 0) {     
             printf("*** ERROR: exec failed\n");
             exit(1);
@@ -198,9 +153,81 @@ void execArgs(char** args,int flagWait)
         }
         return;
     }
+}
+
+void execRedirL(char** args,char **redir,int flagWait){
+        pid_t  pid;
+    int status;
+
+    if ((pid = fork()) < 0) {
+        printf("*** ERROR: forking child process failed\n");
+        exit(1);
+    }
+    else if (pid == 0) { 
+        //open file redir
+        int fd = open(redir[0], O_RDONLY, 0777);
+        if (fd < 0) {
+            printf("*** ERROR: open input file failed\n");
+            exit(1);
+        }   
+        //replace STDIN descriptor by fd descriptor
+        if (dup2(fd, STDIN_FILENO) < 0) {
+            close(fd);
+            printf("*** ERROR: dup failed\n");
+            exit(1);
+        }
+        close(fd);
+        //exec as usual
+        if (execvp(*args, args) < 0) {     
+            printf("*** ERROR: exec failed\n");
+            exit(1);
+        }
+    }
+    else {  
+        if(flagWait == FLAG_WAIT){
+            printf("Waiting for Finish child");
+            while (wait(&status) != pid);
+        }
+        return;
+    }
+}
+void execArgs(char** args,int flagWait, int isWrite )    
+{ 
+    pid_t  pid;
+    int status;
+    pid = fork();
+    if (isWrite== 1 && flagWait == FLAG_WAIT)
+        printf("Waiting for Finish child");
+
+    if (pid < 0) {
+        printf("*** ERROR: forking child process failed\n");
+        exit(1);
+    }
+    else if (pid == 0) { 
+        //sleep(2);    
+        if (execvp(*args, args) < 0) {     
+            printf("*** ERROR: exec failed\n");
+            exit(1);
+        }
+        exit(0);
+    }
+    else { 
+        if (flagWait == FLAG_WAIT) 
+            wait(NULL);
+        //waitpid(pid, &status, 0);
+        /*if(flagWait == FLAG_WAIT){
+            
+            while (wait(&status) != pid);
+        }*/
+        return;
+    }
 } 
 
 void processHelper(char *commandline){
+
+    //printf(commandline);
+    //return;
+
     char * args[MAX_LINE/2+1];
     char *commands[2];
     char *redir[MAX_LINE/2+1];
@@ -213,7 +240,7 @@ void processHelper(char *commandline){
     int flagRedir = -1;
     int flagWait = -1;
 
-
+    fflush(stdout);
     flagPipe = processLine(commandline,commands);
     
     int r = processCommand(commands[0],args,redir,&flagWait);
@@ -227,7 +254,8 @@ void processHelper(char *commandline){
                 }
                 else {
                     //printf("%s_%s_",args[0],args[1]);
-                    execArgs(args,FLAG_WAIT_NONE);
+                    int a = 0;
+                    execArgs(args,FLAG_WAIT, a);
                 }
 
             }else if (r == FLAG_REDIRECTION_R){
@@ -238,7 +266,60 @@ void processHelper(char *commandline){
                 execRedirL(args,redir,flagWait);
             }
 }
+void execPipe(char **commands){
 
+    int parent = fork();
+
+    if (parent > 0){
+        wait(NULL);
+    }
+
+    if (parent == 0)
+    {
+        int pipe1[2];
+        pipe(pipe1);
+
+        int pid = fork();
+
+        if (pid < 0){
+            printf("ERROR forking\n");
+            fflush(stdout);
+            return;
+        }
+        
+        if (pid == 0){
+
+            int pidChild = fork();
+
+            if (pidChild < 0){
+                exit(1);
+            }
+
+            if (pidChild == 0){
+                close(pipe1[1]);
+                dup2(pipe1[0], 0);
+
+                processHelper(commands[1]);
+                //close(pipe1[0]);
+                //close(pipe1[1]);
+            
+                exit(0);
+            }
+            dup2(pipe1[1], 1);
+            processHelper(commands[0]);
+            exit(0);
+        }
+
+        if (pid > 0){
+            wait(NULL);
+            fflush(stdout);
+        }
+        exit(0);
+    }
+
+    //fflush(stdout);
+    return;
+}
 int main(){
     char * args[MAX_LINE/2+1];
     char *commands[2];
@@ -254,6 +335,7 @@ int main(){
     __ini__();
 
     while (shouldRun == 1){
+        fflush(stdout);
         printf("\nosh>");  
         fflush(stdin);
         
@@ -280,9 +362,10 @@ int main(){
                 }
                 else {
                     //printf("%s_%s_",args[0],args[1]);
-                    execArgs(args,flagWait);
-                }
 
+                    execArgs(args,flagWait , 1);
+                }
+                
             }else if (r == FLAG_REDIRECTION_R){
                 //printf("%s",redir[0]);
                 execRedirR(args,redir,flagWait);
